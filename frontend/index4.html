@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Price Optimizer - DBKlik</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background:#f3f5f9; }
+  .card { background:#fff; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+const {
+  LineChart, Line, AreaChart, Area, ComposedChart, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
+} = Recharts;
+
+// ---- CONFIG ---------------------------------------------------------------
+const API_BASE = "http://127.0.0.1:8000";
+const LOOKER_URL = "https://datastudio.google.com/u/0/reporting/61f3bd95-fd9e-4788-b087-4b6ba6378c76/page/mv6wF";
+
+// ---- HELPERS ---------------------------------------------------------------
+const rupiah = (n) => {
+  if (n === undefined || n === null) return "-";
+  if (Math.abs(n) >= 1_000_000_000) return "Rp " + (n / 1_000_000_000).toFixed(2).replace(".", ",") + " M";
+  if (Math.abs(n) >= 1_000_000) return "Rp " + (n / 1_000_000).toFixed(1).replace(".", ",") + " Jt";
+  return "Rp " + n.toLocaleString("id-ID");
+};
+const rupiahFull = (n) => "Rp " + Math.round(n).toLocaleString("id-ID");
+const pct = (n) => (n > 0 ? "+" : "") + n + "%";
+
+function Badge({ value }) {
+  const up = value >= 0;
+  return (
+    <span className={`text-xs font-semibold ${up ? "text-emerald-600" : "text-red-500"}`}>
+      {up ? "↑" : "↓"} {Math.abs(value)}%
+    </span>
+  );
+}
+
+// ---- KPI CARD ---------------------------------------------------------------
+function KpiCard({ label, value, sub, icon, iconBg }) {
+  return (
+    <div className="card p-5 flex-1 min-w-[200px]">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm text-gray-500">{label}</p>
+          <p className="text-2xl font-bold mt-1 text-gray-900">{value}</p>
+          {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+        </div>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${iconBg}`}>{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---- HEADER ---------------------------------------------------------------
+function Header() {
+  return (
+    <div className="flex justify-between items-center px-8 py-4 bg-white border-b">
+      <h1 className="text-lg font-semibold">Price Optimizer</h1>
+      <div className="flex items-center gap-4">
+        <span className="text-gray-400">🔔</span>
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-full bg-gray-200" />
+          <div className="text-sm">
+            <div className="font-medium">Admin DBKlik</div>
+            <div className="text-gray-400 text-xs">Manager</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- DASHBOARD KPIs ---------------------------------------------------------------
+function DashboardSection({ dashboard }) {
+  if (!dashboard) return null;
+  return (
+    <div className="px-8 pt-6">
+      <h2 className="text-xl font-bold">DASHBOARD BISNIS</h2>
+      <p className="text-gray-400 text-sm mb-4">Overview performa bisnis DBKlik</p>
+      <div className="flex gap-4 flex-wrap">
+        <KpiCard label="Total Produk" value={dashboard.total_produk.toLocaleString("id-ID")} sub="SKU" icon="📦" iconBg="bg-blue-50" />
+        <KpiCard label="Total Omset" value={rupiah(dashboard.total_omset)} sub={<Badge value={dashboard.omset_change_pct} />} icon="📈" iconBg="bg-blue-50" />
+        <KpiCard label="Total Profit" value={rupiah(dashboard.total_profit)} sub={<Badge value={dashboard.profit_change_pct} />} icon="💰" iconBg="bg-emerald-50" />
+        <KpiCard label="Total Kompetitor" value={dashboard.total_kompetitor} sub="Toko" icon="👥" iconBg="bg-purple-50" />
+      </div>
+    </div>
+  );
+}
+
+// ---- PERFORMA BISNIS (mini charts + looker link) ---------------------------------------------------------------
+function PerformaBisnis({ dashboard }) {
+  const omsetData = [4.1,3.6,4.4,3.9,4.8,4.2,5.1,4.6,5.0,5.23].map((v,i)=>({i, v}));
+  const profitData = [0.6,0.55,0.7,0.62,0.78,0.68,0.8,0.74,0.79,0.823].map((v,i)=>({i, v}));
+  if (!dashboard) return null;
+  return (
+    <div className="px-8 mt-6">
+      <div className="card p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-bold">PERFORMA BISNIS <span className="text-gray-400 font-normal text-sm">(LOOKER DASHBOARD)</span></h3>
+          </div>
+          <a href={LOOKER_URL} target="_blank" className="text-blue-600 text-sm font-medium">Lihat di Looker ↗</a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <p className="text-sm text-gray-500">Omset (30 Hari)</p>
+            <p className="text-lg font-bold mb-2">{rupiah(dashboard.total_omset)}</p>
+            <ResponsiveContainer width="100%" height={100}>
+              <AreaChart data={omsetData}>
+                <Area type="monotone" dataKey="v" stroke="#2563eb" fill="#dbeafe" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Profit (30 Hari)</p>
+            <p className="text-lg font-bold mb-2">{rupiah(dashboard.total_profit)}</p>
+            <ResponsiveContainer width="100%" height={100}>
+              <AreaChart data={profitData}>
+                <Area type="monotone" dataKey="v" stroke="#16a34a" fill="#dcfce7" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <p className="text-sm font-semibold mb-2">Top Produk <span className="text-gray-400 font-normal">Berdasarkan Omset</span></p>
+            <ol className="text-sm space-y-1">
+              {dashboard.top_produk.map((p,i)=>(
+                <li key={i} className="flex justify-between"><span>{i+1}. {p.name}</span><span className="text-gray-500">{rupiah(p.omset)}</span></li>
+              ))}
+            </ol>
+          </div>
+          <div>
+            <p className="text-sm font-semibold mb-2">Top Kompetitor <span className="text-gray-400 font-normal">Berdasarkan Omset</span></p>
+            <ol className="text-sm space-y-1">
+              {dashboard.top_kompetitor.map((p,i)=>(
+                <li key={i} className="flex justify-between"><span>{i+1}. {p.name}</span><span className="text-gray-500">{rupiah(p.omset)}</span></li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- PRODUCT SEARCH + SIMULATION ---------------------------------------------------------------
+function SimulationSection({ onSimulated }) {
+  const [query, setQuery] = useState("MSI MAG A500DN");
+  const [results, setResults] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [newPrice, setNewPrice] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const search = async (q) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/products?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setResults(data);
+    } catch (e) { setError("Tidak bisa terhubung ke backend. Pastikan server FastAPI berjalan di " + API_BASE); }
+  };
+
+  useEffect(() => { search(query); }, []);
+
+  const selectProduct = async (p) => {
+    setSelected(p);
+    setQuery(p.name);
+    setResults([]);
+    setNewPrice(String(p.Harga_DB));
+  };
+
+  const runSimulation = async () => {
+    if (!selected) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/simulate`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: selected.id, new_price: Number(newPrice) }),
+      });
+      if (!res.ok) throw new Error("simulate failed");
+      const data = await res.json();
+      onSimulated({ product: selected, ...data });
+    } catch (e) { setError("Gagal menjalankan simulasi. Cek koneksi ke backend."); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="card p-6">
+      <h3 className="font-bold">SIMULASI HARGA PRODUK</h3>
+      <p className="text-gray-400 text-sm mb-4">Simulasikan perubahan harga dan lihat prediksi demand & profit</p>
+
+      <label className="text-sm text-gray-500">Cari Produk</label>
+      <div className="relative mb-4">
+        <input
+          className="w-full border rounded-lg px-3 py-2 mt-1 outline-none focus:ring-2 focus:ring-blue-200"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); search(e.target.value); }}
+        />
+        {results.length > 0 && (
+          <div className="absolute z-10 bg-white border w-full rounded-lg mt-1 shadow max-h-48 overflow-auto">
+            {results.map((p) => (
+              <div key={p.id} className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm" onClick={() => selectProduct(p)}>
+                {p.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+
+      {selected && (
+        <div className="flex gap-4 mb-4">
+          <img src={selected.image} className="w-24 h-24 object-contain bg-gray-50 rounded-lg" onError={(e)=>e.target.style.display='none'} />
+          <div className="flex-1">
+            <p className="font-semibold mb-2">{selected.name}</p>
+            <table className="text-sm w-full">
+              <tbody>
+                <tr><td className="text-gray-500 py-1">Harga Saat Ini</td><td className="text-right font-medium">{rupiahFull(selected.Harga_DB)}</td></tr>
+                <tr><td className="text-gray-500 py-1">HPP</td><td className="text-right font-medium">{rupiahFull(selected["HPP (Latest)"])}</td></tr>
+                <tr><td className="text-gray-500 py-1">Margin</td><td className="text-right font-medium">{Math.round((1 - selected["HPP (Latest)"]/selected.Harga_DB)*100)}%</td></tr>
+                <tr><td className="text-gray-500 py-1">Qty Terjual (Minggu Lalu)</td><td className="text-right font-medium">{selected.qty_terjual_minggu_lalu} Unit</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <label className="text-sm text-gray-500">Input Harga Baru</label>
+      <div className="flex items-center border rounded-lg mt-1 mb-1 overflow-hidden">
+        <span className="px-3 text-gray-500 bg-gray-50 py-2">Rp</span>
+        <input type="number" className="flex-1 px-3 py-2 outline-none" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+      </div>
+      <p className="text-xs text-gray-400 mb-4">Masukkan harga yang ingin disimulasikan</p>
+
+      <button onClick={runSimulation} disabled={!selected || loading} className="w-full bg-blue-600 disabled:bg-blue-300 text-white rounded-lg py-3 font-medium">
+        {loading ? "Memproses..." : "✏ SIMULASIKAN"}
+      </button>
+    </div>
+  );
+}
+
+// ---- HASIL SIMULASI ---------------------------------------------------------------
+function ResultCard({ label, value, change }) {
+  return (
+    <div className="border rounded-xl p-4">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-xl font-bold mt-1">{value}</p>
+      {change !== undefined && <Badge value={change} />}
+      {change !== undefined && <span className="text-xs text-gray-400 ml-1">dari kondisi saat ini</span>}
+    </div>
+  );
+}
+
+function HasilSimulasi({ sim }) {
+  if (!sim) {
+    return (
+      <div className="card p-6 flex items-center justify-center text-gray-400 text-sm h-full">
+        Pilih produk dan jalankan simulasi untuk melihat hasilnya di sini.
+      </div>
+    );
+  }
+  const c = sim.comparison;
+  const rows = [
+    ["Harga", rupiahFull(c.harga.current), rupiahFull(c.harga.simulated), c.harga.change_pct],
+    ["Qty Terjual", c.qty.current + " Unit", c.qty.simulated + " Unit", c.qty.change_pct],
+    ["Revenue", rupiahFull(c.revenue.current), rupiahFull(c.revenue.simulated), c.revenue.change_pct],
+    ["Profit", rupiahFull(c.profit.current), rupiahFull(c.profit.simulated), c.profit.change_pct],
+    ["Margin", c.margin_pct.current + "%", c.margin_pct.simulated + "%", c.margin_pct.change_pct],
+  ];
+  return (
+    <div className="card p-6">
+      <h3 className="font-bold">HASIL SIMULASI</h3>
+      <p className="text-gray-400 text-sm mb-4">Prediksi hasil jika harga diubah menjadi {rupiahFull(sim.simulated.price)}</p>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <ResultCard label="Prediksi Qty Terjual" value={sim.simulated.qty + " Unit"} change={c.qty.change_pct} />
+        <ResultCard label="Prediksi Revenue" value={rupiahFull(sim.simulated.revenue)} change={c.revenue.change_pct} />
+        <ResultCard label="Prediksi Profit" value={rupiahFull(sim.simulated.profit)} change={c.profit.change_pct} />
+        <ResultCard label="Prediksi Margin" value={sim.simulated.margin_pct + "%"} change={c.margin_pct.change_pct} />
+      </div>
+      <p className="font-semibold text-sm mb-2">PERBANDINGAN: SAAT INI VS SIMULASI</p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-gray-400 text-left border-b">
+            <th className="py-2">Metrik</th><th>Saat Ini</th><th>Simulasi</th><th>Perubahan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, cur, simv, change]) => (
+            <tr key={label} className="border-b last:border-0">
+              <td className="py-2">{label}</td><td>{cur}</td><td>{simv}</td>
+              <td><Badge value={change} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ---- OPTIMAL PRICE + PROFIT VS HARGA CHART ---------------------------------------------------------------
+function OptimalSection({ product }) {
+  const [opt, setOpt] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const runOptimize = async () => {
+    if (!product) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/optimize`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: product.id }),
+      });
+      const data = await res.json();
+      setOpt(data);
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  useEffect(() => { if (product) runOptimize(); }, [product]);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+      <div className="card p-6">
+        <h3 className="font-bold">REKOMENDASI HARGA OPTIMAL (AI)</h3>
+        <p className="text-gray-400 text-sm mb-4">AI mencari harga dengan profit maksimum</p>
+        {!opt && <p className="text-sm text-gray-400">{loading ? "Menghitung..." : "Belum ada data. Pilih produk dan jalankan simulasi."}</p>}
+        {opt && (
+          <div className="bg-emerald-50 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-emerald-700 text-sm mb-1">🛡 Harga Optimal</div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl font-bold">{rupiahFull(opt.optimal.price)}</span>
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Direkomendasikan</span>
+            </div>
+            <table className="text-sm w-full">
+              <tbody>
+                <tr><td className="text-gray-500 py-1">Harga Saat Ini</td><td className="text-right font-medium">{rupiahFull(opt.current.price)}</td></tr>
+                <tr><td className="text-gray-500 py-1">Profit Saat Ini</td><td className="text-right font-medium">{rupiahFull(opt.current.profit)}</td></tr>
+                <tr><td className="text-gray-500 py-1">Profit Optimal</td><td className="text-right font-medium">{rupiahFull(opt.optimal.profit)}</td></tr>
+                <tr><td className="text-gray-500 py-1">Potensi Kenaikan Profit</td><td className="text-right font-bold text-emerald-600">{pct(opt.potensi_kenaikan_pct)}</td></tr>
+              </tbody>
+            </table>
+            <p className="text-xs text-gray-400 mt-3">💡 AI menganalisis {opt.n_scenarios_tested}+ kemungkinan harga untuk mendapatkan profit maksimum.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card p-6">
+        <h3 className="font-bold">GRAFIK PROFIT VS HARGA</h3>
+        <p className="text-gray-400 text-sm mb-4">Hubungan antara harga, demand dan profit</p>
+        {opt && (
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={opt.curve}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="price" tickFormatter={(v) => (v/1000).toFixed(0) + "K"} fontSize={11} />
+              <YAxis yAxisId="left" fontSize={11} tickFormatter={(v)=> (v/1_000_000).toFixed(0)+"M"} />
+              <YAxis yAxisId="right" orientation="right" fontSize={11} />
+              <Tooltip formatter={(v, n) => n === "profit" ? rupiahFull(v) : v} labelFormatter={(v)=>rupiahFull(v)} />
+              <Legend />
+              <Area yAxisId="left" type="monotone" dataKey="profit" name="Prediksi Profit (Rp)" stroke="#16a34a" fill="#dcfce7" strokeWidth={2} />
+              <Line yAxisId="right" type="monotone" dataKey="qty" name="Prediksi Qty (Unit)" stroke="#2563eb" strokeDasharray="4 2" strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- MODEL ANALYSIS ---------------------------------------------------------------
+function ModelAnalysis() {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/model-info`).then(r => r.json()).then(setInfo).catch(()=>{});
+  }, []);
+  if (!info) return null;
+  const maxImp = Math.max(...info.top_features.map(f => f.importance));
+  return (
+    <div className="px-8 mt-6 mb-10">
+      <h3 className="font-bold mb-1">ANALISIS MODEL (RANDOM FOREST)</h3>
+      <p className="text-gray-400 text-sm mb-4">Informasi model demand prediction</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="card p-6 text-center">
+          <p className="text-sm text-gray-500">Performa Model</p>
+          <p className="text-sm text-gray-400">R² Score</p>
+          <p className="text-4xl font-bold text-emerald-600 my-2">0.86</p>
+          <p className="text-xs text-gray-400">Model memiliki performa baik dalam memprediksi demand</p>
+        </div>
+        <div className="card p-6">
+          <p className="font-semibold text-sm mb-3">Faktor Paling Berpengaruh</p>
+          {info.top_features.map((f, i) => (
+            <div key={f.feature} className="flex items-center gap-2 mb-2 text-sm">
+              <span className="w-4 text-gray-400">{i+1}.</span>
+              <span className="flex-1">{f.feature}</span>
+              <div className="w-28 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-blue-600" style={{ width: `${(f.importance/maxImp)*100}%` }} />
+              </div>
+              <span className="w-10 text-right">{f.importance}</span>
+            </div>
+          ))}
+        </div>
+        <div className="card p-6">
+          <p className="font-semibold text-sm mb-3">Informasi Model</p>
+          <table className="text-sm w-full">
+            <tbody>
+              <tr><td className="text-gray-500 py-1">Model</td><td className="text-right">{info.model_type}</td></tr>
+              <tr><td className="text-gray-500 py-1">n_estimators</td><td className="text-right">{info.n_estimators}</td></tr>
+              <tr><td className="text-gray-500 py-1">max_depth</td><td className="text-right">{info.max_depth}</td></tr>
+              <tr><td className="text-gray-500 py-1">Jumlah Fitur</td><td className="text-right">{info.n_features}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- APP ---------------------------------------------------------------
+function App() {
+  const [dashboard, setDashboard] = useState(null);
+  const [sim, setSim] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/dashboard`).then(r => r.json()).then(setDashboard).catch(()=>{});
+  }, []);
+
+  return (
+    <div>
+      <Header />
+      <DashboardSection dashboard={dashboard} />
+      <PerformaBisnis dashboard={dashboard} />
+
+      <div className="px-8 mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SimulationSection onSimulated={setSim} />
+        <HasilSimulasi sim={sim} />
+      </div>
+
+      <div className="px-8">
+        <OptimalSection product={sim?.product} />
+      </div>
+
+      <ModelAnalysis />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+body{
+    background:#f5f7fb;
+    font-family:'Inter',sans-serif;
+}
+
+.dashboard-card{
+    background:#fff;
+    border-radius:24px;
+    padding:28px;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+    transition:.3s;
+}
+
+.dashboard-card:hover{
+    transform:translateY(-3px);
+}
+
+.user-card{
+    background:white;
+    padding:12px 20px;
+    border-radius:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+    font-weight:600;
+}
+
+.card-title-small{
+    color:#64748b;
+    font-size:14px;
+    margin-bottom:10px;
+}
+
+.card-value{
+    font-size:30px;
+    font-weight:700;
+}
+
+.result-card{
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:20px;
+    min-height:120px;
+}
+
+.result-label{
+    color:#64748b;
+    font-size:14px;
+}
+
+.result-value{
+    margin-top:10px;
+    font-size:28px;
+    font-weight:700;
+}
+
+.product-card{
+    background:#f8fafc;
+    border-radius:14px;
+    border:1px solid #e2e8f0;
+    padding:15px;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:10px;
+}
+
+.btn-primary{
+    background:#2563eb !important;
+    border:none !important;
+}
+
+.btn-success{
+    background:#10b981 !important;
+    border:none !important;
+}
+
+h2,h3,h4,h5{
+    color:#0f172a;
+}
+
+.looker-preview{
+    position:relative;
+    display:block;
+    overflow:hidden;
+    border-radius:20px;
+    transition:.3s;
+}
+
+.looker-preview img{
+    width:100%;
+    transition:.35s;
+}
+
+.looker-preview:hover img{
+    transform:scale(1.02);
+    filter:brightness(.65);
+
+}
+
+.overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:white;
+    font-size:24px;
+    font-weight:700;
+    opacity:0;
+    transition:.3s;
+    background:rgba(0,0,0,.35);
+}
+
+.looker-preview:hover .overlay{
+    opacity:1;
+}
